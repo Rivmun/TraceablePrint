@@ -99,6 +99,8 @@ public class Config {
 	// sizePerMob→脚印贴图缩放倍率（复刻参考工程 DEF_SIZE）：命中条目直接给 float，另叠加幼体 0.66 与实体自身 getScale()。
 	// 注：Map 主字段化后每个 id 只保留一个 float（同 id 后写覆盖先写），不再像旧 List 那样支持"重复写同 id 连乘"——
 	// 需要连乘效果请直接把最终倍率写到一个条目里，语义更直观。
+	// 注：数值一律得写成带小数点的形式（2.0 而不是 2）——配置界面“重置”按钮按当前值与默认值逐字比较，
+	// 而当前值是 Map 经 Float.toString 展回的（必定带 .0），写 2 会让该项重置按钮常年点亮。
 	public static final List<String> DEF_SIZE_PER_MOB = Arrays.asList(
 			"minecraft:chicken,0.6",
 			"minecraft:pig,0.8",
@@ -107,11 +109,11 @@ public class Config {
 			"minecraft:wolf,0.6",
 			"minecraft:sniffer,1.6",
 			"minecraft:enderman,0.6",
-			"minecraft:slime,2",
-			"minecraft:magma_cube,2",
+			"minecraft:slime,2.0",
+			"minecraft:magma_cube,2.0",
 			"minecraft:creeper,0.8",
 			"minecraft:iron_golem,1.2",
-			"minecraft:ravager,2",
+			"minecraft:ravager,2.0",
 			"minecraft:armadillo,0.7"
 	);
 	// blockHeight→脚印在特定方块上生成时的额外 Y 抬升（复刻参考工程 DEF_BLOCKHEIGHT）：雪层/灵魂沙/泥等视觉高度与碰撞箱不符、

@@ -367,7 +367,8 @@ public abstract class LivingEntityMixin {
 		}
 		if (!canGen) {
 			float gate = Common.CONFIG.getHardnessGate();
-			canGen = gate > 0 && Mth.abs(block.getBlock().defaultDestroyTime()) < gate;
+			float hardness = block.getBlock().defaultDestroyTime();
+			canGen = gate > 0 && hardness >= 0 && Mth.abs(hardness) < gate;
 		}
 		return canGen;
 	}

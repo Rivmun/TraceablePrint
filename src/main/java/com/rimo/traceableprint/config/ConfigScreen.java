@@ -134,7 +134,7 @@ public class ConfigScreen {
 
 		cat.addEntry(eb.startFloatField(t("option.hardnessGate"), CONFIG.getHardnessGate())
 				.setDefaultValue(Config.DEFAULT_HARDNESS_GATE)
-				.setMin(0).setMax(20)
+				.setMin(0)
 				.setTooltip(t("option.hardnessGate.@Tooltip"))
 				.setSaveConsumer(CONFIG::setHardnessGate)
 				.build());

@@ -46,7 +46,7 @@ public class Config {
 	public static final float DEFAULT_FOOTPRINT_Y_OFFSET = 0.0F;            // 脚印抬高量（避免与地面 z-fight）
 	// 注：默认左右/前后偏移幅度不再开放给玩家，已硬编码进 LivingEntityMixin（逐生物覆写表命中时优先用表值，二者最终都乘综合缩放倍率）。
 	public static final float DEFAULT_FOOTPRINT_TEXTURE_SIZE = 0.3125F;  // 脚印贴图默认尺寸（方块，正方形边长），5/16 = 匹配原版像素大小；逐生物缩放表在此基础上再乘
-	public static final float DEFAULT_HARDNESS_GATE = 3.0F;            // 硬度门槛：|defaultDestroyTime| < gate 才可生成
+	public static final float DEFAULT_HARDNESS_GATE = 0.7F;            // 硬度门槛：|defaultDestroyTime| < gate 才可生成
 	public static final boolean DEFAULT_NOTIFY_TRACED = true;          // 被追踪提示开关：服务端在有人追到链尾时给父玩家发 action bar 提示
 	public static final boolean DEFAULT_SHOW_DIRECTION_PARTICLES = true; // 方向指示粒子开关：被点击的脚印每秒向下一目标飘一颗紫色小粒子（纯客户端视觉）
 	public static final boolean DEFAULT_PRINTS_FOR_INVISIBLE = true;   // 隐形实体（隐身效果 / invisible 标志）是否仍留脚印

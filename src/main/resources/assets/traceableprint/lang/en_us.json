@@ -15,6 +15,8 @@
   "text.traceableprint.option.spawnInterval": "Spawn Check Interval",
   "text.traceableprint.option.spawnInterval.@Tooltip": "Ticks between movement checks that may drop a new footprint. \nThe per-mob spawn interval list multiplies on top of this.",
   "text.traceableprint.option.lifetime": "Footprint Lifetime",
+  "text.traceableprint.option.rainAgeMultiplier": "Rain Lifetime Multiplier",
+  "text.traceableprint.option.rainAgeMultiplier.@Tooltip": "Fraction of its normal lifetime an exposed footprint keeps while it is raining. \nSet 1.0 to disables the effect.",
   "text.traceableprint.option.minDistance": "Minimum Spacing",
   "text.traceableprint.option.minDistance.@Tooltip": "Minimum distance, in blocks, between two consecutive footprints. Closer steps are skipped. \nThe per-mob spawn interval list multiplies on top of this.",
   "text.traceableprint.option.printsForInvisible": "Invisible Entities Leave Prints",

@@ -37,7 +37,7 @@ public class Common {
 	public static final EntityType<FootprintEntity> FOOTPRINT = EntityType.Builder
 			.<FootprintEntity>of(FootprintEntity::new, MobCategory.MISC)
 			.sized(0.75f, 0.1f) // 判定范围：薄薄一层贴在地面
-			.updateInterval(10) // 不需要同步太多数据
+			.updateInterval(20) // 同步位置/朝向/速度的频率
 			.clientTrackingRange(6) // 实体同步距离：6 区块（96 格）内玩家可见脚印出现与状态变化，作为寻踪线索稍远一些更合适
 			//? if <= 1.21.1 {
 			/*.build("footprint");
@@ -77,7 +77,7 @@ public class Common {
 		}
 	}
 	*///? } else {
-	
+
 	// S2C 空邀约包：服务端校验 op 通过后下发，客户端收到才回传本地配置（防绕过命令直接灌包）。
 	public record UploadRequestPayload() implements CustomPacketPayload {
 		public static final Type<UploadRequestPayload> TYPE =

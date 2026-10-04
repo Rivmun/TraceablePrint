@@ -73,6 +73,14 @@ public class ConfigScreen {
 				.setSaveConsumer(CONFIG::setFootprintLifetimeTicks)
 				.build());
 
+		// 雨天寿命倍率紧跟「脚印持续时间」：它是同一条存续轴上的乘数（露天淋雨时寿命缩到基准 × 该值）
+		cat.addEntry(eb.startFloatField(t("option.rainAgeMultiplier"), CONFIG.getRainAgeMultiplier())
+				.setDefaultValue(Config.DEFAULT_RAIN_AGE_MULTIPLIER)
+				.setMin(0.1F).setMax(1.0F)
+				.setTooltip(t("option.rainAgeMultiplier.@Tooltip"))
+				.setSaveConsumer(CONFIG::setRainAgeMultiplier)
+				.build());
+
 		cat.addEntry(eb.startDoubleField(t("option.minDistance"), CONFIG.getMinSpawnDistance())
 				.setDefaultValue(Config.DEFAULT_MIN_SPAWN_DISTANCE)
 				.setMin(1).setMax(16)

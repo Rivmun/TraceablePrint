@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import net.minecraft.util.Mth;
+
 /**
  * 模组可调参数（纯 Java，零 loader 依赖，双端共用）。
  *
@@ -38,6 +40,9 @@ import java.util.Set;
 public class Config {
 	// - - - - 默认值 - - - -
 	public static final long DEFAULT_FOOTPRINT_LIFETIME_TICKS = 1200L; // 脚印存活时长（tick，1200 = 60 秒），超时自毁
+	// 雨天额外老化倍率：露天淋雨的脚印存活时长缩到「基准寿命 × 该值」（可配 0.1~1.0，1.0 = 雨水不影响寿命）。
+	// 只作用于头顶能被雨打中（isRainingAt 为真）的脚印，屋檐/屋内不受影响。
+	public static final float DEFAULT_RAIN_AGE_MULTIPLIER = 0.75F;
 	public static final double DEFAULT_MIN_SPAWN_DISTANCE = 5.0;        // 与上一脚印的最小间距（方块），过近则跳过生成
 	public static final int DEFAULT_SPAWN_INTERVAL_TICKS = 40;         // 移动检测/生成尝试的固定间隔（tick）
 	public static final int DEFAULT_HIGHLIGHT_TICKS = 200;             // 单次点击的高亮时长（tick，10 秒）
@@ -52,6 +57,7 @@ public class Config {
 	public static final WorkMode DEFAULT_ENABLE_MOD = WorkMode.ALL;       // 模组总开关默认档：所有生物（仍受方块过滤/生物名单约束）
 
 	private long footprintLifetimeTicks = DEFAULT_FOOTPRINT_LIFETIME_TICKS;
+	private float rainAgeMultiplier = DEFAULT_RAIN_AGE_MULTIPLIER;
 	private double minSpawnDistance = DEFAULT_MIN_SPAWN_DISTANCE;
 	private int spawnIntervalTicks = DEFAULT_SPAWN_INTERVAL_TICKS;
 	private int highlightTicks = DEFAULT_HIGHLIGHT_TICKS;
@@ -167,6 +173,14 @@ public class Config {
 	}
 	public void setFootprintLifetimeTicks(long ticks) {
 		this.footprintLifetimeTicks = Math.max(0, ticks);
+	}
+
+	/** 雨天额外老化倍率：读/写都钳到 [0.1, 1.0]（NaN 回默认 0.75），兼顾手改 json 越界与 Gson 绕过 setter 加载。 */
+	public float getRainAgeMultiplier() {
+		return Float.isNaN(rainAgeMultiplier) ? DEFAULT_RAIN_AGE_MULTIPLIER : Mth.clamp(rainAgeMultiplier, 0.1F, 1.0F);
+	}
+	public void setRainAgeMultiplier(float multiplier) {
+		this.rainAgeMultiplier = Float.isNaN(multiplier) ? DEFAULT_RAIN_AGE_MULTIPLIER : Mth.clamp(multiplier, 0.1F, 1.0F);
 	}
 
 	public double getMinSpawnDistance() {
@@ -680,6 +694,7 @@ public class Config {
 	 */
 	private void copyFrom(Config src) {
 		this.footprintLifetimeTicks = src.footprintLifetimeTicks;
+		this.rainAgeMultiplier = src.rainAgeMultiplier;
 		this.minSpawnDistance = src.minSpawnDistance;
 		this.spawnIntervalTicks = src.spawnIntervalTicks;
 		this.highlightTicks = src.highlightTicks;

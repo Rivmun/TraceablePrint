@@ -15,6 +15,8 @@
   "text.traceableprint.option.spawnInterval": "生成间隔",
   "text.traceableprint.option.spawnInterval.@Tooltip": "两次移动检测（可能生成新脚印）之间相隔的 tick 数。每生物生成间隔倍率表会在此值上再乘。",
   "text.traceableprint.option.lifetime": "脚印持续时间",
+  "text.traceableprint.option.rainAgeMultiplier": "下雨时持续时间缩短",
+  "text.traceableprint.option.rainAgeMultiplier.@Tooltip": "露天淋雨时脚印保留的寿命比例。\n设为 1.0 表示雨水不影响寿命。",
   "text.traceableprint.option.minDistance": "最小间距",
   "text.traceableprint.option.minDistance.@Tooltip": "相邻生成的两个脚印之间的最小距离（方块）；过近则跳过生成。每生物生成间隔倍率表会在此值上再乘。",
   "text.traceableprint.option.printsForInvisible": "为隐形实体生成脚印",

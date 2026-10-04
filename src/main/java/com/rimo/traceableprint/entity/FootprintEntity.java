@@ -43,8 +43,9 @@ import java.util.UUID;
  * PARENT_UUID 记录生成它的父生物；NEXT_UUID 记录同一条足迹链中的下一个脚印（由服务端生成时写入），
  * 玩家点击脚印即依链寻踪；无后继且确为链尾时跳向父生物本体。
  *
- * 存续采用“自毁”而非链上限：genTime 记录生成时的绝对游戏时间并持久化，
- * 服务端每秒比对 genTime+lifetime，超时即 discard；从存档加载的过期脚印同样自毁，无需外部管理器维护。
+ * 存续采用“自毁”而非链上限：genTime 记录生成时的绝对游戏时间（同步 + 持久化），rainAge 记录雨天额外老化
+ * （两端各自本地累加、不走同步，服务端额外落 NBT），
+ * 服务端每秒比对 (now−genTime)+rainAge 与 lifetime，超时即 discard；从存档加载的过期脚印同样自毁，无需外部管理器维护。
  */
 public class FootprintEntity extends Entity {
 	// 该脚印所属的父生物 UUID（26.1 已移除 OPTIONAL_UUID 序列化器，改用字符串存储）
@@ -60,7 +61,7 @@ public class FootprintEntity extends Entity {
 	private static final EntityDataAccessor<Boolean> IS_TAIL =
 			SynchedEntityData.defineId(FootprintEntity.class, EntityDataSerializers.BOOLEAN);
 	// 生成时的绝对游戏时间（服务端 level 时钟），走同步数据：
-	// 服务端 tick 据此判定过期自毁，客户端渲染器据此计算淡出透明度。
+	// 服务端 tick 据此 + rainAge 判定过期自毁，客户端渲染器据此计算淡出透明度。
 	private static final EntityDataAccessor<Long> GEN_TIME =
 			SynchedEntityData.defineId(FootprintEntity.class, EntityDataSerializers.LONG);
 	// 脚印贴图最终边长（方块，服务端生成时按「基准尺寸 × 逐生物倍率 × 幼体 × getScale」算好并同步）：
@@ -75,6 +76,10 @@ public class FootprintEntity extends Entity {
 
 	// 高亮倒计时：纯客户端本地状态（谁点击谁知道），由交互直接写入、客户端 tick 递减，驱动渲染器金色脉冲。
 	private int clientHighlightTicks = 0;
+
+	// 雨天额外老化量（tick）：两端各自逐 tick 累加（isRainingAt 为真时 += 1/倍率 − 1）的本地字段，不走同步；
+	// 服务端那份权威（决定移除）且额外落 NBT 供重启续算，客户端那份仅驱动淡出。与 GEN_TIME 共同构成存续进度。
+	private float rainAge = 0.0F;
 
 	// 方向指示倒计时：写在“被点击”的本脚印上（而非被点亮的那个），交互时一次写入、客户端 tick 递减。
 	private int directionTicks = 0;
@@ -229,9 +234,19 @@ public class FootprintEntity extends Entity {
 		return this.entityData.get(GEN_TIME);
 	}
 
+	/** 雨天额外老化量（tick，本地字段，两端各自累加；服务端额外落 NBT，不走同步）。 */
+	public float getRainAge() {
+		return this.rainAge;
+	}
+	private void setRainAge(float age) {
+		this.rainAge = age;
+	}
+
 	/**
-	 * 存续进度 0..1：(当前游戏时间 - 生成时间) / 总时长。与 getFadeAlpha() 同源于一条时间轴，
-	 * 供渲染把贴图从生成时的抬高量线性下沉到销毁前（“陷入地里”而不是原地变透明）。
+	 * 存续进度 0..1：(当前游戏时间 − 生成时间 + 雨天额外老化) / 总时长。与 getFadeAlpha()、服务端过期判定
+	 * 同源于一条时间轴，供渲染把贴图从生成时的抬高量线性下沉到销毁前（“陷入地里”而不是原地变透明）。
+	 * rainAge 为本地累加字段（非同步）：从出生即被追踪时两端同起点同规则逐 tick 累加，淡出与服务端移除锁步；
+	 * 仅“中途才进入视野”的脚印客户端从 0 起算、比服务端少淋一段而略微晚淡，但那一段你并不在场、看不见。
 	 * 未播种 / 时长非法时按 0（刚生成）处理。
 	 */
 	public float getLifeProgress() {
@@ -239,7 +254,8 @@ public class FootprintEntity extends Entity {
 		long lifetime = Common.CONFIG.getFootprintLifetimeTicks();
 		if (genTime <= 0 || lifetime <= 0) return 0.0F;
 		long now = this.level().getLevelData().getGameTime();
-		return Mth.clamp((float) (now - genTime) / (float) lifetime, 0.0F, 1.0F);
+		float age = (float) (now - genTime) + this.getRainAge();
+		return Mth.clamp(age / (float) lifetime, 0.0F, 1.0F);
 	}
 
 	/**
@@ -288,6 +304,8 @@ public class FootprintEntity extends Entity {
 		} catch (IllegalStateException e) {
 			this.pendingGenTime = genTime;
 		}
+		// 恢复雨天额外老化：缺失时按 0（未淋雨）兜底
+		this.setRainAge((float) (tag.contains("RainAge") ? tag.getDouble("RainAge") : 0.0));
 		// 恢复贴图边长：缺失时按基准尺寸兜底
 		this.setTexSize((float) (tag.contains("TexSize") ? tag.getDouble("TexSize") : com.rimo.traceableprint.config.Config.DEFAULT_FOOTPRINT_TEXTURE_SIZE));
 		// 恢复贴图名：缺失时按空串（默认 footprint 贴图）兜底
@@ -309,6 +327,8 @@ public class FootprintEntity extends Entity {
 			// 极端情况：读档时机早于同步数据构建，缓到首次服务端 tick 补写
 			this.pendingGenTime = genTime;
 		}
+		// 恢复雨天额外老化：缺失时按 0（未淋雨）兜底
+		this.setRainAge((float) input.getDoubleOr("RainAge", 0.0));
 		// 恢复贴图边长：缺失时按基准尺寸兜底
 		this.setTexSize((float) input.getDoubleOr("TexSize", com.rimo.traceableprint.config.Config.DEFAULT_FOOTPRINT_TEXTURE_SIZE));
 		// 恢复贴图名：缺失时按空串（默认 footprint 贴图）兑底。存档里的名字可能是旧配置留下的，
@@ -323,6 +343,7 @@ public class FootprintEntity extends Entity {
 		tag.putString("ParentUUID", getParentUUID().map(UUID::toString).orElse(""));
 		tag.putString("NextUUID", getNextUUID().map(UUID::toString).orElse(""));
 		tag.putLong("GenTime", this.getGenTime());
+		tag.putDouble("RainAge", this.getRainAge());
 		tag.putDouble("TexSize", this.getTexSize());
 		String textureName = this.getTextureName();
 		if (!textureName.isEmpty()) {
@@ -335,6 +356,7 @@ public class FootprintEntity extends Entity {
 		output.putString("ParentUUID", getParentUUID().map(UUID::toString).orElse(""));
 		output.putString("NextUUID", getNextUUID().map(UUID::toString).orElse(""));
 		output.putLong("GenTime", this.getGenTime());
+		output.putDouble("RainAge", this.getRainAge());
 		output.putDouble("TexSize", this.getTexSize());
 		String textureName = this.getTextureName();
 		if (!textureName.isEmpty()) {
@@ -524,6 +546,9 @@ public class FootprintEntity extends Entity {
 	@Override
 	public void tick() {
 		super.tick();
+		// 两端各自逐 tick 累加雨天额外老化（本地字段，非同步）：服务端据此权威移除、客户端据此淡出。
+		// 放在端分支与相位闸门之前让客户端也参与；晴天 isRainingAt 首行 isRaining() 短路，成本仅一次布尔读。
+		this.accumulateRainAge();
 		// 高亮倒计时与方向指示倒计时（纯客户端本地，每个玩家只维护自己的）：
 		// 前者归零后渲染器自然回到非高亮管线；后者挂在“被点击”的本脚印上，与是否被点亮无关，故分两条独立递减
 		if (this.level().isClientSide()) {
@@ -548,9 +573,9 @@ public class FootprintEntity extends Entity {
 			this.entityData.set(GEN_TIME, this.pendingGenTime != null ? this.pendingGenTime : now);
 			this.pendingGenTime = null;
 		}
-		// 过期自毁：与存续检测共用 phase 窗口，超时即 discard，无需检查方块
+		// 过期自毁：绝对基准 (now − genTime) + 雨天额外老化 rainAge 一并计入（与 getLifeProgress 同源），超时即 discard
 		long now = this.level().getLevelData().getGameTime();
-		if (now > this.getGenTime() + Common.CONFIG.getFootprintLifetimeTicks()) {
+		if (now - this.getGenTime() + this.getRainAge() > Common.CONFIG.getFootprintLifetimeTicks()) {
 			this.discard();
 			return;
 		}
@@ -558,6 +583,20 @@ public class FootprintEntity extends Entity {
 		if (!isFootprintValid(this.level(), this.getX(), this.getY(), this.getZ())) {
 			this.discard();
 		}
+	}
+
+	/**
+	 * 雨天额外老化（双端各自 tick 调用）：脚印所在格露天淋雨时，把本地 rainAge 每 tick 累加 (1/倍率 − 1)。
+	 * 倍率 v∈[0.1,1] 来自 {@link com.rimo.traceableprint.config.Config#getRainAgeMultiplier()}，含义是“雨中脚印只存活基准寿命的 v 比例”：
+	 * 等效时钟被提速到 1/v，故除绝对时间基准 (now−genTime) 已计的 1/tick 外，额外补 (1/v − 1)/tick；全程淋雨时总寿命精确缩为 lifetime × v。
+	 * 倍率 ≥1（关闭）直接跳过，连方块都不查；{@code isRainingAt} 首行以全局 {@code isRaining()} 短路，晴天每 tick 仅一次布尔读。
+	 * rainAge 为本地字段（非同步）：服务端那份权威（决定移除）且落 NBT，客户端那份仅驱动淡出；两端用各自本地配置与本端 isRainingAt 独立累加。
+	 */
+	private void accumulateRainAge() {
+		float multiplier = Common.CONFIG.getRainAgeMultiplier();
+		if (multiplier >= 1.0F) return;
+		if (!this.level().isRainingAt(this.blockPosition())) return;
+		this.setRainAge(this.getRainAge() + (1.0F / multiplier - 1.0F));
 	}
 
 	/**

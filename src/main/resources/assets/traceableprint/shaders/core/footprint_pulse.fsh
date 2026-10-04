@@ -1,11 +1,12 @@
+// 分支内的空行占位必须写 "//"，不能写 "//#"（会被剥成非法的裸 "#" 行），原因见 footprint_pulse.vsh 顶部。
 //? if < 26.3 {
 //#version 330
-//#
+//
 //#moj_import <minecraft:dynamictransforms.glsl>
-//#
+//
 //in vec4 vertexColor;
 //in vec2 texCoord0;
-//#
+//
 //out vec4 fragColor;
 //? } else {
 #version 330

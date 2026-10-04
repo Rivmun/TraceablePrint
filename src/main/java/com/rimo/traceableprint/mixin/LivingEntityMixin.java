@@ -68,6 +68,10 @@ public abstract class LivingEntityMixin {
 	@Unique private static final double traceableprint$DEFAULT_SIDE_OFFSET = 0.125F;
 	@Unique private static final double traceableprint$DEFAULT_FORWARD_OFFSET = 0.0625F;
 
+	// 被玩家骑乘的坐骑生成加速倍率：马类等在玩家操控下前进极快，据此把「生成冷却」与「最小间距」两道闸门一并 ×0.5
+	// （加密、拉近），让高速坐骑身后拖出更连续的足迹。只做加速、不做未骑减速；固定值、不开放配置（与参考工程一致）。
+	@Unique private static final float traceableprint$RIDED_SPAWN_MULTIPLIER = 0.5F;
+
 	@Inject(method = "tick", at = @At("TAIL"))
 	private void traceableprint$onTick(CallbackInfo ci) {
 		LivingEntity entity = (LivingEntity) (Object) this;
@@ -112,7 +116,7 @@ public abstract class LivingEntityMixin {
 
 	/**
 	 * 当前生效的移动生成间隔（tick）：基础值来自 spawnIntervalTicks，先乘每生物生成间隔倍率（mobIntervalList，
-	 * 未命中为 1.0），再在冲刺时缩短至三分之二，最后四舍五入并强制下限 1 tick。
+	 * 未命中为 1.0），再在冲刺时缩短至三分之二，被玩家骑乘的坐骑再乘 {@code traceableprint$RIDED_SPAWN_MULTIPLIER} 加密，最后四舍五入并强制下限 1 tick。
 	 *【为何先乘倍率再取整】把倍率留在 int 上（先转 int 再乘）会让 0.6 这类小倍率在 base=1 时被截回原值；
 	 * 先乘后取整则在小 base、小倍率下自然向到 1 tick 下限，语义上是“最多密到这个程度”而不是“倍率失效”。
 	 */
@@ -120,6 +124,7 @@ public abstract class LivingEntityMixin {
 	private static int traceableprint$spawnInterval(LivingEntity entity) {
 		float base = Common.CONFIG.getSpawnIntervalTicks() * traceableprint$intervalMultiplier(entity);
 		if (entity.isSprinting()) base *= 2.0F / 3.0F;
+		if (traceableprint$isPlayerRidden(entity)) base *= traceableprint$RIDED_SPAWN_MULTIPLIER;
 		return Math.max(1, Math.round(base));
 	}
 
@@ -131,6 +136,17 @@ public abstract class LivingEntityMixin {
 	@Unique
 	private static float traceableprint$intervalMultiplier(LivingEntity entity) {
 		return Common.CONFIG.resolveIntervalMultiplier(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString());
+	}
+
+	/**
+	 * 该实体是否正被玩家骑乘操控：坐骑的 {@code getControllingPassenger()} 返回驾驶它的实体（玩家操控时即为玩家）。
+	 * 马类等可操控坐骑在玩家骑乘下前进速度极快，据此触发 {@code traceableprint$RIDED_SPAWN_MULTIPLIER} 的生成加速；
+	 * 口径为「被玩家操控的坐骑」，不绑前后偏移表（故猪、炽足兽等被玩家驾驶时同样命中）。
+	 * {@code getControllingPassenger()} 是 {@code Entity} public、跨 1.20.1~26.x 签名一致，{@code instanceof Player} 即可，无需 stonecutter 分支。
+	 */
+	@Unique
+	private static boolean traceableprint$isPlayerRidden(LivingEntity entity) {
+		return entity.getControllingPassenger() instanceof Player;
 	}
 
 	// 持久化链尾 UUID：写入生物 NBT，卸载重载/服务端重启后链头不丢（值取自服务端 @Unique 字段）
@@ -246,6 +262,8 @@ public abstract class LivingEntityMixin {
 		float intervalMul = Common.CONFIG.resolveIntervalMultiplier(mobId);
 		double minDist = Common.CONFIG.getMinSpawnDistance() * intervalMul;
 		if (parent.isSprinting()) minDist *= 2.0 / 3.0;
+		// 被玩家骑乘的坐骑：与冷却闸门同一倍率把最小间距也一并缩短（否则高速下更近的落点仍会被间距拦住，表现为“加速没生效”）
+		if (traceableprint$isPlayerRidden(parent)) minDist *= traceableprint$RIDED_SPAWN_MULTIPLIER;
 		if (minDist > 0 && lastId != null && world.getEntity(lastId) instanceof FootprintEntity prevFp) {
 			double ddx = prevFp.getX() - spawnX;
 			double ddz = prevFp.getZ() - spawnZ;

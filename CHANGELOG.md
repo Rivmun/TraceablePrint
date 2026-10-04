@@ -3,6 +3,9 @@ Broadcast released for 26.3-neobric (merged fabric/neoforge by Forgix), 26.2-neo
 - Fix default hardness gate set too high.
 - Fix yOffset will apply to hitbox that leads print will instantly destroy.
 - Fix server-side cannot control printSize entirely.
+- Add PerMobInterval list to control footprint generation speed for specific mobs.
+- Add rain reduction option to make print destroy faster when raining.
+- Speed up 2x for mob which is ridden by player.
 - Improve list access performance.
 - Rework the translation key.
 - Other small optimization.

@@ -14,6 +14,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -238,7 +239,7 @@ public class FootprintEntity extends Entity {
 		long lifetime = Common.CONFIG.getFootprintLifetimeTicks();
 		if (genTime <= 0 || lifetime <= 0) return 0.0F;
 		long now = this.level().getLevelData().getGameTime();
-		return Math.clamp((float) (now - genTime) / (float) lifetime, 0.0F, 1.0F);
+		return Mth.clamp((float) (now - genTime) / (float) lifetime, 0.0F, 1.0F);
 	}
 
 	/**

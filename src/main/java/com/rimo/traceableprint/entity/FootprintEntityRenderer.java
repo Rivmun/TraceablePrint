@@ -88,7 +88,7 @@ public class FootprintEntityRenderer extends EntityRenderer<FootprintEntity, Foo
 		// 全局同步的脉冲相位：用世界游戏时间（+插值）而非实体年龄，让所有高亮脚印同步闪烁
 		state.gameTime = entity.level().getGameTime() + tickDelta;
 		// 存续淡出：剩余时长不足总时长一半时线性变透明（min(1, 剩余/(总/2))）
-		state.fadeAlpha = Math.clamp(entity.getFadeAlpha(), 0.0F, 1.0F);
+		state.fadeAlpha = Mth.clamp(entity.getFadeAlpha(), 0.0F, 1.0F);
 		// 存续下沉：按整段生命线性插值（与 fadeAlpha 的“后半段才淡出”是两条独立曲线，但同源于存续进度）
 		// 抬高量 = 存续下沉曲线 + 配置的全局贴图高度偏移（纯渲染，不影响实体坐标/判定盒/存续检测）
 		state.renderY = Mth.lerp(entity.getLifeProgress(), RENDER_Y_AT_BIRTH, RENDER_Y_AT_DEATH) + Common.CONFIG.getFootprintYOffset();

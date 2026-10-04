@@ -13,10 +13,10 @@
   "text.traceableprint.work_mode.player_only": "仅玩家",
   "text.traceableprint.work_mode.disabled": "禁用",
   "text.traceableprint.option.spawnInterval": "生成间隔",
-  "text.traceableprint.option.spawnInterval.@Tooltip": "两次移动检测（可能生成新脚印）之间相隔的 tick 数。",
+  "text.traceableprint.option.spawnInterval.@Tooltip": "两次移动检测（可能生成新脚印）之间相隔的 tick 数。每生物生成间隔倍率表会在此值上再乘。",
   "text.traceableprint.option.lifetime": "脚印持续时间",
   "text.traceableprint.option.minDistance": "最小间距",
-  "text.traceableprint.option.minDistance.@Tooltip": "相邻生成的两个脚印之间的最小距离（方块）；过近则跳过生成。",
+  "text.traceableprint.option.minDistance.@Tooltip": "相邻生成的两个脚印之间的最小距离（方块）；过近则跳过生成。每生物生成间隔倍率表会在此值上再乘。",
   "text.traceableprint.option.printsForInvisible": "为隐形实体生成脚印",
   "text.traceableprint.option.printsForInvisible.@Tooltip": "§c潜行状态无论此项如何都不留脚印。",
 
@@ -44,7 +44,9 @@
 
   "text.traceableprint.category.per_mob": "覆写",
   "text.traceableprint.per_mob.header": "条目格式为「§9§o命名空间:名称,数值§r」。生物不支持标签。修改后不影响已生成的脚印。",
-  "text.traceableprint.option.sizeList": "逐生物尺寸",
+  "text.traceableprint.option.mobIntervalList": "每生物生成间隔倍率",
+  "text.traceableprint.option.mobIntervalList.@Tooltip": "倍率同时乘在「生成间隔」与「最小间距」上：小于 1 更频繁更密集，大于 1 更稀疏。",
+  "text.traceableprint.option.sizeList": "逐生物尺寸倍率",
   "text.traceableprint.option.sizeList.@Tooltip": "缩放特定生物的脚印。",
   "text.traceableprint.option.sideOffsetList": "逐生物左右偏移",
   "text.traceableprint.option.sideOffsetList.@Tooltip": "为特定生物设置左右偏移幅度。",
@@ -65,6 +67,7 @@
   "text.traceableprint.row_error.invalid_id": "id 不合法。请用「§9§onamespace:path§r」，标签则用「§9§o#namespace:tag§r」。",
   "text.traceableprint.row_error.empty_value": "数值（逗号之后）为空。",
   "text.traceableprint.row_error.invalid_float": "数值不是一个合法的数字。",
+  "text.traceableprint.row_error.non_positive": "倍率必须是正数（0 与负数不生效）。",
   "text.traceableprint.row_error.empty_candidates": "id 之后没有给出任何贴图名。",
   "text.traceableprint.row_error.duplicate_id": "id 重复——每个 id 只应出现一次，请合并这些条目。"
 }

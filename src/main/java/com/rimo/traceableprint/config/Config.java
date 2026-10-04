@@ -2,18 +2,13 @@ package com.rimo.traceableprint.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.google.gson.JsonParser;
 import com.rimo.traceableprint.Common;
 import com.rimo.traceableprint.PlatformUtil;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -31,11 +26,14 @@ import java.util.Set;
  * 读写经 Gson 序列化到写死路径 {@code Platform.PLATFORM.getConfigFolder()/traceableprint.json}：{@link #load()} 于构造单例时调用，
  * {@link #save()} 供配置变更后落盘。集合字段非 final，便于 Gson 直接反序列化填充。
  *
- * <p><b>逐生物覆写表的主字段是 Map</b>（{@code sideOffsetMap / forwardOffsetMap / sizeMap / blockHeightMap / textureMap}），
+ * <p><b>逐生物覆写表的主字段是 Map</b>（{@code sideOffsetMap / forwardOffsetMap / sizeMap / mobIntervalMap / blockHeightMap / textureMap}），
  * 而不是历史上的 {@code List<String>} 字符串条目表：单一数据源、无缓存失效、查询天然 O(1)。
  * ConfigScreen 一侧仍按 {@code List<String>}（"id,value" 形态）读写：{@code setXxxList}/{@code getXxxList}
  * 保留原签名，内部经 {@link #parseFloatMap} / {@link #parseTextureMap} 与 {@link #formatFloatMap} / {@link #formatTextureMap} 转手。
- * 磁盘上老配置（"sizeList": ["id,val",...]）会在 {@link #load()} / {@link #applyJson} 里一次性迁移到 Map 形态（{@link #migrateLegacy}）。
+ *
+ * <p><b>不做老配置（{@code "sizeList": ["id,val",...]}）的兼容迁移</b>：模组尚未大规模应用，直接以 Map 形态为准。
+ * 老 json 里的 List 字段属于未知键，Gson 读入时忽略、写回时不再出现，对应覆写表回到默认值——
+ * 此事作为配置系统的破坏性变更写进更新日志，不给玩家留一份“看着像迁移成功其实全丢了”的错觉。
  */
 public class Config {
 	// - - - - 默认值 - - - -
@@ -124,6 +122,20 @@ public class Config {
 			"minecraft:soul_sand,0.125",
 			"minecraft:mud,0.125"
 	);
+	// mobIntervalList→每生物生成间隔倍率：命中条目同时乘在 spawnIntervalTicks（时间）与 minSpawnDistance（距离）上，
+	// 小于 1 = 更频繁、更密的脚印，大于 1 = 更稀疏；未列出的生物按 1.0 处理（保持全局节奏不变）。
+	// 默认值按“蹄足/爪足细碎 → 频，大步重型 → 稀”给：蜘蛛类八足碎步取 0.5，苦力怕略快于默认 0.8，
+	// 骆驼与铁傀儡腿长步慢取 2.0，体型最大、动作最缓的嗅探兽取 3.0。
+	// 数值一律写成带小数点的形式（2.0 而不是 2）：同 DEF_SIZE_PER_MOB 的教训——配置界面“重置”按钮按当前值与默认值逐字比较，
+	// 而当前值是 Map 经 Float.toString 展回的（必定带 .0）。
+	public static final List<String> DEF_MOB_INTERVAL = Arrays.asList(
+			"minecraft:spider,0.5",
+			"minecraft:cave_spider,0.5",
+			"minecraft:camel,2.0",
+			"minecraft:sniffer,3.0",
+			"minecraft:iron_golem,2.0",
+			"minecraft:creeper,0.8"
+	);
 	// textureList→格式提示条目（不删、也不当配置读）：本模组的 json 配置没有注释能力，留一条样例让直接改文件的玩家
 	// 一眼看懂格式；它永不命中（mod_id:mob_id 不是任何已注册实体），因此不产生任何效果。
 	// 退一步讲，即使真有模组注册了这个 id，候选名也找不到对应贴图，客户端存在性校验会退回默认贴图，不会崩、也不会粉黑块。
@@ -135,15 +147,17 @@ public class Config {
 	// 一律 LinkedHashMap：保留 JSON 里的书写顺序，也保留默认常量的顺序，写回磁盘时 diff 稳定；查询仍是 O(1)。
 	// 声明顺序在 DEF_* 常量之后，静态初始化时能拿到已就绪的默认常量。
 
-	/** entityId -> 左右偏移幅度（可正可负，调用方取绝对值再随机符号）；float 非法的老条目在迁移期就被丢弃 */
+	/** entityId -> 左右偏移幅度（可正可负，调用方取绝对值再随机符号）；float 非法的条目在解析时就被丢弃 */
 	private Map<String, Float> sideOffsetMap = parseFloatMap(DEF_SIDE_OFFSET_LIKE);
 	/** entityId -> 前后偏移幅度；语义同 {@link #sideOffsetMap} */
 	private Map<String, Float> forwardOffsetMap = parseFloatMap(DEF_FORWARD_OFFSET_LIKE);
 	/** entityId -> 贴图缩放倍率（同 id 后写覆盖先写，不再连乘）；幼体 0.66 与 getScale() 由调用方另乘 */
 	private Map<String, Float> sizeMap = parseFloatMap(DEF_SIZE_PER_MOB);
+	/** entityId -> 生成间隔倍率；同时乘在生成间隔与最小间距上，非正数/NaN 在查询侧视作未配置（见 {@link #resolveIntervalMultiplier}） */
+	private Map<String, Float> mobIntervalMap = parseFloatMap(DEF_MOB_INTERVAL);
 	/** 落脚方块 -> 额外 Y 抬升：key 可以是精确 id "namespace:path" 或标签 "#namespace:tag"；查询走「id 优先、标签兜底」 */
 	private Map<String, Float> blockHeightMap = parseFloatMap(DEF_BLOCK_HEIGHT);
-	/** entityId -> 候选贴图名列表；一个 id 一行，多个候选用逗号并置（旧 List 里"多行同 id 聚合"的写法由迁移一次性合并） */
+	/** entityId -> 候选贴图名列表；一个 id 对应一项，多个候选用逗号并置（同一 id 写多项时后写覆盖先写） */
 	private Map<String, List<String>> textureMap = parseTextureMap(DEF_TEXTURE_LIST);
 
 	// - - - - - 标量项 getter/setter - - - - -
@@ -342,6 +356,19 @@ public class Config {
 	}
 
 	/**
+	 * 每生物生成间隔倍率表（"modid:mobid,float"）；解析/覆盖语义同 {@link #setSideOffsetList(List)}。
+	 * 倍率同时作用于「时间」（spawnIntervalTicks）与「距离」（minSpawnDistance），
+	 * 只乘其一会出现“间隔改了但闸门没改”的错配：例如倍率 0.5 下脚印每半个窗口就生成一次，
+	 * 却被原样的 5 格间距闸门接连拦掉，实际频率毫无变化。
+	 */
+	public void setMobIntervalList(List<String> entries) {
+		this.mobIntervalMap = parseFloatMap(entries);
+	}
+	public List<String> getMobIntervalList() {
+		return formatFloatMap(mobIntervalMap);
+	}
+
+	/**
 	 * 方块额外抬高表（"blockid,float" 或 "#tagid,float"）：Map 主字段化后 key 直接支持两种写法混存，
 	 * 查询规则「精确 id 优先、标签兜底」（见 LivingEntityMixin#traceableprint$blockHeightOffset）。
 	 */
@@ -407,6 +434,19 @@ public class Config {
 	}
 
 	/**
+	 * 按实体注册名（namespace:path）取生成间隔倍率：{@code mobIntervalMap.get(entityId)}，未命中返回 1.0F。
+	 * 只按 id 精确匹配，不匹配标签（与 sizeMap / 偏移表同一套规则）。
+	 *【为何要挡住非正数】0 与负数会让冷却恒为 1 tick、间距闸门恒为 0，玩家一个 tick 踩出一地脚印；
+	 * NaN 更阴 —— {@code ddx*ddx + ddz*ddz < NaN} 恒为 false，最小间距会整体失效而变成“每 tick 都生成”。
+	 * 故这里统一用 {@code !(v > 0)} 兜底（NaN 与 0、负数一并落回 1.0），而不是只在 setter 里校验一次。
+	 */
+	public float resolveIntervalMultiplier(String entityId) {
+		if (entityId == null) return 1.0F;
+		Float v = mobIntervalMap.get(entityId);
+		return v == null || !(v > 0.0F) ? 1.0F : v;
+	}
+
+	/**
 	 * 在左右偏移表中按实体注册名（namespace:path）查找自定义幅度：{@code sideOffsetMap.get(entityId)}；
 	 * 未命中或 float 非法返回 null（后者在 parse 阶段已丢弃，不会出现在 Map 里）。
 	 * 只按 id 精确匹配，不匹配标签。
@@ -422,7 +462,7 @@ public class Config {
 		return forwardOffsetMap.get(entityId);
 	}
 
-	// - - - - - List<String> "id,value" <-> Map 转换（ConfigScreen 视图 & 迁移期共用） - - - - -
+	// - - - - - List<String> "id,value" <-> Map 转换（ConfigScreen 视图与默认常量解析共用） - - - - -
 
 	/**
 	 * 解析 "id,float" 形态的条目列表到 LinkedHashMap（保留插入序，diff 稳定）。
@@ -448,7 +488,7 @@ public class Config {
 
 	/**
 	 * 解析 "id,name1,name2,..." 形态的条目列表到 LinkedHashMap。
-	 * 语义：同 id 后写覆盖先写（新配置一行一 id，聚合在旧 List 里靠多行同 id；迁移时 {@link #migrateLegacy} 会显式合并）；
+	 * 语义：同 id 后写覆盖先写（一行一 id，多个候选并置在同一行）；
 	 * 首个逗号之后的各段去空白、跳过空段；无候选（全空段）时留空列表，让查询侧自然回退默认贴图。
 	 */
 	static Map<String, List<String>> parseTextureMap(List<String> entries) {
@@ -537,6 +577,16 @@ public class Config {
 		return null;
 	}
 
+	/** 每生物生成间隔倍率行专用校验：{@link #validateFloatRow} 的全部错误码之上再加 {@code non_positive}。 */
+	public static String validateIntervalRow(String row) {
+		String code = validateFloatRow(row);
+		if (code != null) return code;
+		float v = Float.parseFloat(row.substring(row.indexOf(',') + 1).trim());
+		// !(v > 0) 兼拦 0 / 负数 / NaN：这些值在查询侧会默默回退 1.0（“写了却没用”），故直接在输入行报错。
+		// 不拦 Infinity：它正好对应“永不生成新脚印”的极端稀疏语义，与玩家写大数的意图一致。
+		return v > 0.0F ? null : "non_positive";
+	}
+
 	/**
 	 * 校验 {@code "id,candidate1,candidate2,..."} 形态单行。合法返回 {@code null}；否则错误码：
 	 * {@code empty_row} / {@code missing_comma} / {@code empty_id} / {@code invalid_id} / {@code empty_candidates}。
@@ -554,64 +604,6 @@ public class Config {
 		return "empty_candidates";
 	}
 
-	// - - - - - 老配置 List<String> 字段的一次性迁移（JsonParser 前置 pass，之后 save 就写出 Map 形态） - - - - -
-
-	/** 老字段名 → 新字段名，float 类 Map 五对（前四对语义相同、textureMap 值形态是字符串数组） */
-	private static final String[][] LEGACY_FLOAT_MAP_FIELDS = {
-			{"sideOffsetList", "sideOffsetMap"},
-			{"forwardOffsetList", "forwardOffsetMap"},
-			{"sizeList", "sizeMap"},
-			{"blockHeightList", "blockHeightMap"},
-	};
-	private static final String[][] LEGACY_TEXTURE_MAP_FIELDS = {
-			{"textureList", "textureMap"},
-	};
-
-	/**
-	 * 若 json 里存在老形态的 {@code List<String>} 字段而对应的新形态 Map 字段缺席，就把老 List 展成新 Map 注入。
-	 * 迁移只在 load / applyJson 读入瞬间发生一次，之后 save 直接落 Map 形态；老字段被 {@code remove} 掉不残留在 json 里。
-	 * 若新老字段同时存在（用户半手动改过 json 或从新客户端上传上来的），保留新字段、丢弃老字段（新字段是权威）。
-	 */
-	private static void migrateLegacy(JsonObject obj) {
-		for (String[] pair : LEGACY_FLOAT_MAP_FIELDS) {
-			migrateField(obj, pair[0], pair[1], /*isTextureMap*/ false);
-		}
-		for (String[] pair : LEGACY_TEXTURE_MAP_FIELDS) {
-			migrateField(obj, pair[0], pair[1], /*isTextureMap*/ true);
-		}
-	}
-
-	private static void migrateField(JsonObject obj, String oldKey, String newKey, boolean isTextureMap) {
-		if (!obj.has(oldKey)) return;
-		JsonElement old = obj.remove(oldKey); // 无论迁移成功与否，老字段都不再进 json
-		if (obj.has(newKey)) return;          // 新字段已存在：以新为准，老字段就地丢弃
-		if (!old.isJsonArray()) return;
-		List<String> entries = new ArrayList<>();
-		for (JsonElement e : old.getAsJsonArray()) {
-			if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isString()) entries.add(e.getAsString());
-		}
-		if (isTextureMap) {
-			// 老 List 支持"多行同 id 聚合"（每行候选合并进同一 id 的候选池）；迁移期显式合并再交给 parseTextureMap
-			Map<String, List<String>> merged = new LinkedHashMap<>();
-			for (String entry : entries) {
-				if (entry == null) continue;
-				int comma = entry.indexOf(',');
-				if (comma < 0) continue;
-				String id = entry.substring(0, comma).trim();
-				if (id.isEmpty()) continue;
-				List<String> bucket = merged.computeIfAbsent(id, k -> new ArrayList<>());
-				for (String name : entry.substring(comma + 1).split(",")) {
-					String t = name.trim();
-					if (!t.isEmpty()) bucket.add(t);
-				}
-			}
-			obj.add(newKey, GSON.toJsonTree(merged));
-		} else {
-			// float 类：直接复用 parseFloatMap（同 id 后写覆盖，非法丢弃）
-			obj.add(newKey, GSON.toJsonTree(parseFloatMap(entries)));
-		}
-	}
-
 	/* - - - - - IO（Gson 序列化，参考 SuperFancyClouds SharedConfig，仅保留 load/save）- - - - - */
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -621,13 +613,12 @@ public class Config {
 	/**
 	 * 从 {@code CONFIG_PATH} 载入并回填到当前实例，返回 {@code this} 以便链式初始化。
 	 * 文件不存在时写入一份默认配置；读取/解析失败则保留当前值（默认）不影响运行。
-	 * Gson 会新建一个 Config 反序列化（未出现的键保持默认值，天然向后兼容新增字段），再复制到本实例。
-	 * 载入前对 json 树跑一次 {@link #migrateLegacy}，把老 List 字段就地改写成新 Map 字段。
+	 * Gson 会新建一个 Config 反序列化（未出现的键保持默认值，天然向后兼容新增字段；未知键直接忽略），再复制到本实例。
 	 */
 	public Config load() {
 		if (Files.exists(CONFIG_PATH)) {
 			try (BufferedReader reader = Files.newBufferedReader(CONFIG_PATH)) {
-				Config loaded = parseWithMigration(reader);
+				Config loaded = GSON.fromJson(reader, Config.class);
 				if (loaded != null) {
 					this.copyFrom(loaded);
 				}
@@ -664,14 +655,13 @@ public class Config {
 	 * 解析上传来的 JSON 并回填到当前实例，成功返回 {@code true}。
 	 * 解析失败/空串返回 {@code false} 且不改动现有值（落盘由调用方决定）。
 	 * 注意：Gson 按 {@code name()} 反序列化 {@link WorkMode}；未出现的键保持默认，天然向后兼容。
-	 * 与 {@link #load()} 共用迁移前置：万一客户端版本落后上传了老格式 json，服务端也能识别。
 	 */
 	public boolean applyJson(String json) {
 		if (json == null || json.isEmpty()) {
 			return false;
 		}
 		try {
-			Config parsed = parseWithMigrationString(json);
+			Config parsed = GSON.fromJson(json, Config.class);
 			if (parsed == null) {
 				return false;
 			}
@@ -681,19 +671,6 @@ public class Config {
 			Common.LOGGER.error("Failed to parse uploaded config JSON", e);
 			return false;
 		}
-	}
-
-	/** load 与 applyJson 共用的读入前置：把老 List 字段迁移成新 Map 字段，再交给 Gson 反序列化。 */
-	private static Config parseWithMigration(Reader reader) {
-		JsonElement root = JsonParser.parseReader(reader);
-		if (root.isJsonObject()) migrateLegacy(root.getAsJsonObject());
-		return GSON.fromJson(root, Config.class);
-	}
-
-	private static Config parseWithMigrationString(String json) {
-		JsonElement root = JsonParser.parseString(json);
-		if (root.isJsonObject()) migrateLegacy(root.getAsJsonObject());
-		return GSON.fromJson(root, Config.class);
 	}
 
 	/**
@@ -719,6 +696,7 @@ public class Config {
 		this.sideOffsetMap = nullSafe(src.sideOffsetMap, Config::parseFloatMapEmpty);
 		this.forwardOffsetMap = nullSafe(src.forwardOffsetMap, Config::parseFloatMapEmpty);
 		this.sizeMap = nullSafe(src.sizeMap, Config::parseFloatMapEmpty);
+		this.mobIntervalMap = nullSafe(src.mobIntervalMap, Config::parseFloatMapEmpty);
 		this.blockHeightMap = nullSafe(src.blockHeightMap, Config::parseFloatMapEmpty);
 		this.textureMap = nullSafe(src.textureMap, Config::parseTextureMapEmpty);
 	}

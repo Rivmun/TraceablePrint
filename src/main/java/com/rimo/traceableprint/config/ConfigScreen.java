@@ -166,6 +166,12 @@ public class ConfigScreen {
 		// 该分类整体是「条目字符串」列表，格式统一但字段各异，先在顶部放一段格式说明，比每个列表各写一遍更省版面
 		cat.addEntry(eb.startTextDescription(t("per_mob.header")).build());
 
+		// 每生物生成间隔倍率排在本分类首位：它与通用分类的「生成间隔」「最小间距」是同一套判定的乘数，语义上离得最近
+		// 校验多一道「必须为正数」（validateIntervalRow）：0/负数在查询侧只是默默回到 1.0，不报出来玩家会以为生效了
+		addValidatedList(cat, eb, t("option.mobIntervalList"), CONFIG.getMobIntervalList(),
+				new ArrayList<>(Config.DEF_MOB_INTERVAL), t("option.mobIntervalList.@Tooltip"),
+				CONFIG::setMobIntervalList, Config::validateIntervalRow);
+
 		addValidatedList(cat, eb, t("option.sizeList"), CONFIG.getSizeList(),
 				new ArrayList<>(Config.DEF_SIZE_PER_MOB), t("option.sizeList.@Tooltip"),
 				CONFIG::setSizeList, Config::validateFloatRow);

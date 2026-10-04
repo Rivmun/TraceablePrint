@@ -2,7 +2,7 @@
   "entity.traceableprint.footprint": "Footprint",
   "traceableprint.message.be_tracked": "Someone is tracking you...",
   "traceableprint.message.own_footprints": "Seems it's your own trail...",
-  "text.traceableprint.config.missing_dependency": "Cloth Config is required to open this config screen. Install it and try again.",
+  "text.traceableprint.config.missing_dependency": "Cloth Config is required to open this config screen. \nInstall it and try again.",
 
   "text.traceableprint.title": "Traceable Print Settings",
   "text.traceableprint.seconds": "%s s",
@@ -13,16 +13,16 @@
   "text.traceableprint.work_mode.player_only": "Player Only",
   "text.traceableprint.work_mode.disabled": "Disabled",
   "text.traceableprint.option.spawnInterval": "Spawn Check Interval",
-  "text.traceableprint.option.spawnInterval.@Tooltip": "Ticks between movement checks that may drop a new footprint.",
+  "text.traceableprint.option.spawnInterval.@Tooltip": "Ticks between movement checks that may drop a new footprint. \nThe per-mob spawn interval list multiplies on top of this.",
   "text.traceableprint.option.lifetime": "Footprint Lifetime",
   "text.traceableprint.option.minDistance": "Minimum Spacing",
-  "text.traceableprint.option.minDistance.@Tooltip": "Minimum distance, in blocks, between two consecutive footprints. Closer steps are skipped.",
+  "text.traceableprint.option.minDistance.@Tooltip": "Minimum distance, in blocks, between two consecutive footprints. Closer steps are skipped. \nThe per-mob spawn interval list multiplies on top of this.",
   "text.traceableprint.option.printsForInvisible": "Invisible Entities Leave Prints",
   "text.traceableprint.option.printsForInvisible.@Tooltip": "§cSneaking always suppresses prints regardless of this setting.",
 
   "text.traceableprint.category.appearance": "Appearance",
   "text.traceableprint.option.textureSize": "Footprint Size",
-  "text.traceableprint.option.textureSize.@Tooltip": "Base size of a footprint in blocks (square side length). The per-mob size list multiplies on top of this.",
+  "text.traceableprint.option.textureSize.@Tooltip": "Base size of a footprint in blocks (square side length). \nThe per-mob size list multiplies on top of this.",
   "text.traceableprint.appearance.header": "§cThe settings below apply locally only and are not affected by the server.",
   "text.traceableprint.option.yOffset": "Height Offset",
   "text.traceableprint.option.yOffset.@Tooltip": "Unit: blocks. Does not affect the hitbox height.",
@@ -34,7 +34,7 @@
 
   "text.traceableprint.category.filter": "Filtering",
   "text.traceableprint.option.hardnessGate": "Hardness Gate",
-  "text.traceableprint.option.hardnessGate.@Tooltip": "Footprints only appear where the block's hardness is below this value. Blocks in the 'Block Whitelist' bypass this check.\nCommon block hardness values:\nmoss block 0.1, dirt & sand 0.6, grass block 0.6,\nrail 0.7, sandstone 0.8, stone 1.5,\ncobblestone 2, raw ore 3, ore block 5.",
+  "text.traceableprint.option.hardnessGate.@Tooltip": "Footprints only appear where the block's hardness is below this value. \nBlocks in the 'Block Whitelist' bypass this check.\nCommon block hardness values:\nmoss block 0.1, dirt & sand 0.6, grass block 0.6,\nrail 0.7, sandstone 0.8, stone 1.5,\ncobblestone 2, raw ore 3, ore block 5.",
   "text.traceableprint.option.applyBlocks": "Block Whitelist",
   "text.traceableprint.option.applyBlocks.@Tooltip": "Blocks that always allow footprints regardless of the hardness gate.\nWrite §9§onamespace:path§r, or §9§o#namespace:tag§r for a tag.",
   "text.traceableprint.option.entityListInverted": "Invert Entity List",
@@ -44,7 +44,9 @@
 
   "text.traceableprint.category.per_mob": "Overrides",
   "text.traceableprint.per_mob.header": "Each entry is '§9§onamespace:name,value§r'. Mobs do not support tags. Changes here do not affect footprints that have already spawned.",
-  "text.traceableprint.option.sizeList": "Per-Mob Size",
+  "text.traceableprint.option.mobIntervalList": "Per-Mob Spawn Interval Multiplier",
+  "text.traceableprint.option.mobIntervalList.@Tooltip": "A multiplier applied to both the spawn check interval and the minimum spacing for these mobs: \nbelow 1 leaves prints more often and closer together, above 1 makes them sparser.",
+  "text.traceableprint.option.sizeList": "Per-Mob Size Multipiler",
   "text.traceableprint.option.sizeList.@Tooltip": "Scale the footprint for specific mobs.",
   "text.traceableprint.option.sideOffsetList": "Per-Mob Side Offset",
   "text.traceableprint.option.sideOffsetList.@Tooltip": "Set the left/right offset for specific mobs.",
@@ -65,6 +67,7 @@
   "text.traceableprint.row_error.invalid_id": "Invalid id. Use '§9§onamespace:path§r', or '§9§o#namespace:tag§r' for a tag.",
   "text.traceableprint.row_error.empty_value": "The value (after the comma) is empty.",
   "text.traceableprint.row_error.invalid_float": "The value is not a valid number.",
+  "text.traceableprint.row_error.non_positive": "The multiplier must be a positive number (0 and negative values are ignored).",
   "text.traceableprint.row_error.empty_candidates": "No texture name given after the id.",
   "text.traceableprint.row_error.duplicate_id": "Duplicate id - each id may appear only once; merge these entries."
 }

@@ -52,7 +52,7 @@ import java.util.UUID;
  */
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin {
-	// 尝试生成脚印的固定间隔（tick）由 Common.CONFIG.getSpawnIntervalTicks() 提供，此处只做倒计时
+	// 尝试生成脚印的固定间隔（tick）由 Common.CONFIG.getSpawnIntervalTicks() 提供（再乘每生物生成间隔倍率），此处只做倒计时
 	@Unique private int traceableprint$footprintCooldown = 0;
 	@Unique private boolean traceableprint$wasOnGround = true;
 	// 记录上一次检测时的位置，只用真实位移判断“是否在移动”（方向另走速度，见 spawnFootprint）
@@ -111,13 +111,26 @@ public abstract class LivingEntityMixin {
 	}
 
 	/**
-	 * 当前生效的移动生成间隔（tick）：基础值来自 spawnIntervalTicks，冲刺时缩短至三分之二（下限 1 tick）。
+	 * 当前生效的移动生成间隔（tick）：基础值来自 spawnIntervalTicks，先乘每生物生成间隔倍率（mobIntervalList，
+	 * 未命中为 1.0），再在冲刺时缩短至三分之二，最后四舍五入并强制下限 1 tick。
+	 *【为何先乘倍率再取整】把倍率留在 int 上（先转 int 再乘）会让 0.6 这类小倍率在 base=1 时被截回原值；
+	 * 先乘后取整则在小 base、小倍率下自然向到 1 tick 下限，语义上是“最多密到这个程度”而不是“倍率失效”。
 	 */
 	@Unique
 	private static int traceableprint$spawnInterval(LivingEntity entity) {
-		int base = Common.CONFIG.getSpawnIntervalTicks();
-		if (entity.isSprinting()) return Math.max(1, Math.round(base * 2.0F / 3.0F));
-		return base;
+		float base = Common.CONFIG.getSpawnIntervalTicks() * traceableprint$intervalMultiplier(entity);
+		if (entity.isSprinting()) base *= 2.0F / 3.0F;
+		return Math.max(1, Math.round(base));
+	}
+
+	/**
+	 * 每生物生成间隔倍率（Config.mobIntervalMap）：按注册名 namespace:path 精确匹配，不查标签，
+	 * 未命中（及非正数/NaN）回退 1.0。与尺寸/偏移表同一个取 id 写法；
+	 * 本方法只在冷却刷新与间距闸门两处被调（每生物每生成窗口一次），构造一次小字符串在噪声以下。
+	 */
+	@Unique
+	private static float traceableprint$intervalMultiplier(LivingEntity entity) {
+		return Common.CONFIG.resolveIntervalMultiplier(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString());
 	}
 
 	// 持久化链尾 UUID：写入生物 NBT，卸载重载/服务端重启后链头不丢（值取自服务端 @Unique 字段）
@@ -228,8 +241,10 @@ public abstract class LivingEntityMixin {
 		UUID lastId = traceableprint$parseUuid(this.traceableprint$lastFootprint);
 
 		// 最小间距：与上一个脚印（若仍在世界）过近则跳过，防原地跳跃/慢蹭刷屏（上一脚印卸载/取不到则放行）
-		// 冲刺时闸门同样缩短至三分之二，让高速下更密集的落点（含更近的落地）也能留印
-		double minDist = Common.CONFIG.getMinSpawnDistance();
+		// 每生物生成间隔倍率与最小间距同乘（与上面冷却里的倍率一致，否则“时间变密、空间不变”会互相抵消），
+		// 冲刺时闸门再缩短至三分之二，让高速下更密集的落点（含更近的落地）也能留印
+		float intervalMul = Common.CONFIG.resolveIntervalMultiplier(mobId);
+		double minDist = Common.CONFIG.getMinSpawnDistance() * intervalMul;
 		if (parent.isSprinting()) minDist *= 2.0 / 3.0;
 		if (minDist > 0 && lastId != null && world.getEntity(lastId) instanceof FootprintEntity prevFp) {
 			double ddx = prevFp.getX() - spawnX;

@@ -1,5 +1,11 @@
 # 1.0.1
-- Internal improve.
+Broadcast released for 26.3-neobric (merged fabric/neoforge by Forgix), 26.2-neobric, 26.1-neobric, 1.21.11-neoforge/fabric, 1.21.1-neoforge/fabric, 1.20.1-forge/fabric.
+- Fix default hardness gate set too high.
+- Fix yOffset will apply to hitbox that leads print will instantly destroy.
+- Fix server-side cannot control printSize entirely.
+- Improve list access performance.
+- Rework the translation key.
+- Other small optimization.
 
 # 1.0.0
 

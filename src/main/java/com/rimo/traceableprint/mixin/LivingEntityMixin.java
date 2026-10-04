@@ -65,8 +65,8 @@ public abstract class LivingEntityMixin {
 
 	// 默认左右/前后偏移幅度（方块）：不再开放给玩家配置，硬编码于此；逐生物覆写表命中时优先用表值，
 	// 二者最终都乘综合缩放倍率（见 spawnFootprint 里的 footprintScale）。
-	@Unique private static final double traceableprint$DEFAULT_SIDE_OFFSET = 0.15;
-	@Unique private static final double traceableprint$DEFAULT_FORWARD_OFFSET = 0.0;
+	@Unique private static final double traceableprint$DEFAULT_SIDE_OFFSET = 0.125F;
+	@Unique private static final double traceableprint$DEFAULT_FORWARD_OFFSET = 0.0625F;
 
 	@Inject(method = "tick", at = @At("TAIL"))
 	private void traceableprint$onTick(CallbackInfo ci) {
